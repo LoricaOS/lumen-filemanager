@@ -1,27 +1,27 @@
 # lumen-filemanager
 
-The graphical file manager for **AspisOS**, a capability-based,
+The graphical file manager for **LoricaOS**, a capability-based,
 no-ambient-authority operating system built on the from-scratch
-[Aegis](https://github.com/AspisOS/Aegis) kernel.
+[Aegis](https://github.com/LoricaOS/Aegis) kernel.
 
 lumen-filemanager is a traditional file manager — a column list view with
 navigation history, file operations, drag-and-drop, and "open with" dispatch.
-It is an external client of the [lumen](https://github.com/AspisOS/lumen)
+It is an external client of the [lumen](https://github.com/LoricaOS/lumen)
 compositor (the same window-protocol pattern as the terminal and editor),
-distributed as a [herald](https://github.com/AspisOS/AspisOS) package and
+distributed as a [herald](https://github.com/LoricaOS/LoricaOS) package and
 installed as an `/apps` bundle. Its descriptor's display name is **Files**.
 
-## The AspisOS ecosystem
+## The LoricaOS ecosystem
 
-AspisOS is decomposed into independent repositories; lumen-filemanager is one
+LoricaOS is decomposed into independent repositories; lumen-filemanager is one
 graphical leaf of that tree:
 
 | Repo | Role |
 |------|------|
-| [`AspisOS/Aegis`](https://github.com/AspisOS/Aegis) | The kernel. Provides the capability model, `AF_UNIX` sockets, the filesystems the manager browses, and the `SYS_SPAWN` syscall it uses to open files. |
-| [`AspisOS/lumen`](https://github.com/AspisOS/lumen) | The compositor / display server. Every GUI app is a lumen client; the file manager connects to its socket for a window, input events, and drag-and-drop brokering. |
-| [`AspisOS/glyph`](https://github.com/AspisOS/glyph) | The GUI toolkit. Supplies the software renderer (`draw_*`, `font_*`), the theme palette, and the client side of lumen's window protocol (`lumen_client.h`) this app links against. |
-| [`AspisOS/AspisOS`](https://github.com/AspisOS/AspisOS) | The OS: userland, rootfs, ISO/installer, and the herald package manager that installs this `.hpkg`. |
+| [`LoricaOS/Aegis`](https://github.com/LoricaOS/Aegis) | The kernel. Provides the capability model, `AF_UNIX` sockets, the filesystems the manager browses, and the `SYS_SPAWN` syscall it uses to open files. |
+| [`LoricaOS/lumen`](https://github.com/LoricaOS/lumen) | The compositor / display server. Every GUI app is a lumen client; the file manager connects to its socket for a window, input events, and drag-and-drop brokering. |
+| [`LoricaOS/glyph`](https://github.com/LoricaOS/glyph) | The GUI toolkit. Supplies the software renderer (`draw_*`, `font_*`), the theme palette, and the client side of lumen's window protocol (`lumen_client.h`) this app links against. |
+| [`LoricaOS/LoricaOS`](https://github.com/LoricaOS/LoricaOS) | The OS: userland, rootfs, ISO/installer, and the herald package manager that installs this `.hpkg`. |
 
 ## What it does
 
@@ -65,7 +65,7 @@ Grounded in `src/main.c`:
 
 ## Capabilities
 
-AspisOS has no ambient authority: a process can do nothing except through
+LoricaOS has no ambient authority: a process can do nothing except through
 capabilities granted at exec time. lumen-filemanager's policy
 (`pkg/etc/aegis/caps.d/filemanager`) is the baseline desktop-app profile:
 
@@ -85,7 +85,7 @@ first-party and signature-trusted, installed verbatim by herald.
 
 ## Building
 
-lumen-filemanager fetches a pinned [glyph](https://github.com/AspisOS/glyph)
+lumen-filemanager fetches a pinned [glyph](https://github.com/LoricaOS/glyph)
 toolkit artifact (the GUI libraries it links) and builds against it, then packs
 a signed herald package.
 
@@ -126,11 +126,11 @@ GLYPH_VERSION   the pinned glyph toolkit version it builds against
 ## Dependencies
 
 `depends=lumen` — the file manager is a Lumen client and opens files into Lumen
-apps, so installing it pulls [lumen](https://github.com/AspisOS/lumen) (which in
+apps, so installing it pulls [lumen](https://github.com/LoricaOS/lumen) (which in
 turn ships the desktop fonts every dependent inherits). The opener apps it
-dispatches to ([editor](https://github.com/AspisOS/lumen-editor),
-[imageviewer](https://github.com/AspisOS/lumen-imageviewer),
-[tunes](https://github.com/AspisOS/lumen-tunes)) are resolved at runtime by path
+dispatches to ([editor](https://github.com/LoricaOS/lumen-editor),
+[imageviewer](https://github.com/LoricaOS/lumen-imageviewer),
+[tunes](https://github.com/LoricaOS/lumen-tunes)) are resolved at runtime by path
 and used only if present.
 
 ## Status
@@ -139,4 +139,4 @@ Functional and used as the desktop's primary browser, with a few honest gaps:
 copying or pasting whole *folders* is not supported yet (single-file copy and
 folder *moves* on the same filesystem work); the text editor refuses files over
 512 KB; and the Delete / F2 keys are unbound pending E0 scancode delivery from
-the PS/2 path. Expect these to close as AspisOS matures.
+the PS/2 path. Expect these to close as LoricaOS matures.

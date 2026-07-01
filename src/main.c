@@ -1487,7 +1487,8 @@ int main(int argc, char **argv)
         if (win_h < 300) win_h = 300;
     }
 
-    g_fm.lwin = lumen_window_create(g_fm.lfd, "Files", win_w, win_h);
+    g_fm.lwin = lumen_window_create_ex(g_fm.lfd, "Files", win_w, win_h,
+                                       LUMEN_WIN_FLAG_RESIZABLE);
     if (!g_fm.lwin) {
         dprintf(2, "[FILES] lumen_window_create failed\n");
         close(g_fm.lfd);
@@ -1532,6 +1533,26 @@ int main(int argc, char **argv)
         if (r < 0) break;
         if (r == 1) {
             if (ev.type == LUMEN_EV_CLOSE_REQUEST) break;
+            if (ev.type == LUMEN_EV_RESIZED) {
+                if (lumen_window_apply_resize(g_fm.lwin, ev.resized.new_w,
+                                              ev.resized.new_h) == 0) {
+                    g_fm.fb_w = g_fm.lwin->w;
+                    g_fm.fb_h = g_fm.lwin->h;
+                    g_fm.surf = (surface_t){
+                        .buf = (uint32_t *)g_fm.lwin->backbuf,
+                        .w = g_fm.fb_w, .h = g_fm.fb_h,
+                        .pitch = g_fm.lwin->stride,
+                    };
+                    /* vis_rows() is derived live from fb_h, but the cached
+                     * scroll offset can now be past the end — clamp it and
+                     * keep the selection visible. */
+                    int vr = vis_rows();
+                    if (g_fm.top > g_fm.nent - vr) g_fm.top = g_fm.nent - vr;
+                    if (g_fm.top < 0) g_fm.top = 0;
+                    scroll_to_sel();
+                    g_fm.dirty = 1;
+                }
+            }
             if (ev.type == LUMEN_EV_KEY && ev.key.pressed)
                 handle_key((char)ev.key.keycode);
             if (ev.type == LUMEN_EV_MOUSE)

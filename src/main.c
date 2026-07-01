@@ -32,6 +32,7 @@
 #include <sys/syscall.h>
 
 #include <glyph.h>
+#include <layout.h>
 #include <lumen_client.h>
 #include "font.h"
 
@@ -730,17 +731,22 @@ typedef struct { int x, y, w, h; const char *label; } btn_rect_t;
  * window keeps a sane layout). */
 static void toolbar_layout(btn_rect_t out[BTN_COUNT])
 {
-    int y = 5, h = TOOLBAR_H - 10;
-    out[BTN_BACK]   = (btn_rect_t){ 8,   y, 30, h, "<" };
-    out[BTN_FWD]    = (btn_rect_t){ 42,  y, 30, h, ">" };
-    out[BTN_UP]     = (btn_rect_t){ 76,  y, 30, h, "^" };
-    int dw = 60, rw = 70, nw = 92;
-    int dx = g_fm.fb_w - 8 - dw;
-    int rx = dx - 6 - rw;
-    int nx = rx - 6 - nw;
-    out[BTN_NEWDIR] = (btn_rect_t){ nx, y, nw, h, "New Folder" };
-    out[BTN_RENAME] = (btn_rect_t){ rx, y, rw, h, "Rename" };
-    out[BTN_DELETE] = (btn_rect_t){ dx, y, dw, h, "Delete" };
+    /* The toolbar row inset by the 8/5 margins. Nav buttons peel off the left
+     * (gap 4); action buttons peel off the right (gap 6) — all anchored to the
+     * live width, whatever the leftover middle is (the address bar). */
+    glyph_rect_t row = { 8, 5, g_fm.fb_w - 16, TOOLBAR_H - 10 };
+    glyph_rect_t bk = glyph_cut_left(&row, 30, 4);
+    glyph_rect_t fw = glyph_cut_left(&row, 30, 4);
+    glyph_rect_t up = glyph_cut_left(&row, 30, 4);
+    glyph_rect_t de = glyph_cut_right(&row, 60, 6);
+    glyph_rect_t rn = glyph_cut_right(&row, 70, 6);
+    glyph_rect_t nd = glyph_cut_right(&row, 92, 6);
+    out[BTN_BACK]   = (btn_rect_t){ bk.x, bk.y, bk.w, bk.h, "<" };
+    out[BTN_FWD]    = (btn_rect_t){ fw.x, fw.y, fw.w, fw.h, ">" };
+    out[BTN_UP]     = (btn_rect_t){ up.x, up.y, up.w, up.h, "^" };
+    out[BTN_NEWDIR] = (btn_rect_t){ nd.x, nd.y, nd.w, nd.h, "New Folder" };
+    out[BTN_RENAME] = (btn_rect_t){ rn.x, rn.y, rn.w, rn.h, "Rename" };
+    out[BTN_DELETE] = (btn_rect_t){ de.x, de.y, de.w, de.h, "Delete" };
 }
 
 static int btn_enabled(int i)

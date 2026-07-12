@@ -1060,7 +1060,7 @@ static void render_toolbar(void)
     toolbar_layout(b);
     for (int i = 0; i < BTN_COUNT; i++) {
         int en = btn_enabled(i);
-        draw_rounded_rect(s, b[i].x, b[i].y, b[i].w, b[i].h, 4,
+        draw_rounded_rect(s, b[i].x, b[i].y, b[i].w, b[i].h, R_SM,
                           en ? THEME_SURFACE_2 : THEME_SURFACE);
         uint32_t fg = en ? THEME_TEXT : THEME_TEXT_FAINT;
         int lw = ui_w(14, b[i].label);
@@ -1076,7 +1076,7 @@ static void render_toolbar(void)
     int px = b[BTN_UP].x + b[BTN_UP].w + 10;
     int pw = b[BTN_NEWDIR].x - 10 - px;
     if (pw > 40) {
-        draw_rounded_rect(s, px, 5, pw, TOOLBAR_H - 10, 4, C_INPUT_BG);
+        draw_rounded_rect(s, px, 5, pw, TOOLBAR_H - 10, R_SM, C_INPUT_BG);
         const char *p = g_fm.cwd;
         size_t plen = strlen(p);
         while (plen > 1 && ui_w(14, p) > pw - 16) { p++; plen--; }
@@ -1095,7 +1095,7 @@ static void render_modal(void)
 
     int mw = 400, mh = (g_fm.modal == MODAL_DELETE) ? 110 : 140;
     int mx = (g_fm.fb_w - mw) / 2, my = (g_fm.fb_h - mh) / 2;
-    draw_rounded_rect(s, mx, my, mw, mh, 8, THEME_SURFACE_2);
+    draw_rounded_rect(s, mx, my, mw, mh, R_MD, THEME_SURFACE_2);
     draw_rect(s, mx, my, mw, mh, THEME_BORDER_STRONG);
 
     ui_text(15, mx + 16, my + 12, g_fm.modal_msg, THEME_TEXT);
@@ -1103,7 +1103,7 @@ static void render_modal(void)
     int by = my + mh - 40;
     if (g_fm.modal != MODAL_DELETE) {
         /* input box with cursor */
-        draw_rounded_rect(s, mx + 16, my + 44, mw - 32, 28, 4, C_INPUT_BG);
+        draw_rounded_rect(s, mx + 16, my + 44, mw - 32, 28, R_SM, C_INPUT_BG);
         draw_rect(s, mx + 16, my + 44, mw - 32, 28, C_INPUT_BD);
         ui_text(15, mx + 24, my + 49, g_fm.input, THEME_TEXT);
         int cx = mx + 24 + ui_w(15, g_fm.input);
@@ -1112,11 +1112,11 @@ static void render_modal(void)
 
     const char *ok = (g_fm.modal == MODAL_DELETE) ? "Delete" : "OK";
     /* OK + Cancel buttons (geometry mirrored in modal_click) */
-    draw_rounded_rect(s, mx + mw - 180, by, 80, 28, 4,
+    draw_rounded_rect(s, mx + mw - 180, by, 80, 28, R_SM,
                       (g_fm.modal == MODAL_DELETE) ? THEME_ERROR : C_BTN);
     ui_text(14, mx + mw - 180 + (80 - ui_w(14, ok)) / 2, by + 6, ok,
             THEME_TEXT_ON_ACCENT);
-    draw_rounded_rect(s, mx + mw - 92, by, 80, 28, 4, THEME_SURFACE_2);
+    draw_rounded_rect(s, mx + mw - 92, by, 80, 28, R_SM, THEME_SURFACE_2);
     ui_text(14, mx + mw - 92 + (80 - ui_w(14, "Cancel")) / 2, by + 6,
             "Cancel", THEME_TEXT);
 }
@@ -1156,9 +1156,14 @@ static void render(void)
         if (e->is_dir) draw_folder_glyph(12, y + (ROW_H - 18) / 2);
         else           draw_file_glyph(12, y + (ROW_H - 18) / 2);
 
-        /* dimmed cut-clipboard entry */
-        uint32_t col = e->is_dir ? THEME_TEXT : THEME_TEXT_DIM;
-        if (g_fm.clip_valid && g_fm.clip_cut) {
+        /* Selected row is filled with the accent (C_SEL_BG == THEME_SELECTION),
+         * so its text must use the on-accent token or it's unreadable under a
+         * light accent. Non-selected rows keep normal/dim text (and the dimmed
+         * cut-clipboard entry). */
+        int selected = (idx == g_fm.sel);
+        uint32_t col = selected ? THEME_TEXT_ON_ACCENT
+                                : (e->is_dir ? THEME_TEXT : THEME_TEXT_DIM);
+        if (!selected && g_fm.clip_valid && g_fm.clip_cut) {
             char full[800];
             join_path(full, sizeof(full), g_fm.cwd, e->name);
             if (strcmp(full, g_fm.clip) == 0) col = THEME_TEXT_FAINT;
@@ -1170,7 +1175,7 @@ static void render(void)
             fmt_size(sz, sizeof(sz), e->size);
             int w = ui_w(13, sz);
             ui_text(13, g_fm.fb_w - SBAR_W - 14 - w, y + (ROW_H - 15) / 2,
-                    sz, THEME_TEXT_DIM);
+                    sz, selected ? THEME_TEXT_ON_ACCENT : THEME_TEXT_DIM);
         }
     }
 

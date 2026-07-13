@@ -326,6 +326,16 @@ static void reload_dir(void)
     scroll_to_sel();
 }
 
+/* Toggle showing dotfiles and reload the current directory. */
+static void toggle_hidden(void)
+{
+    g_fm.show_hidden = !g_fm.show_hidden;
+    reload_dir();
+    set_status(g_fm.show_hidden ? "hidden files shown"
+                                : "hidden files hidden", THEME_TEXT_DIM);
+    g_fm.dirty = 1;
+}
+
 /* ── History (back / forward) ─────────────────────────────────────────── */
 
 static void hist_push(const char *path)
@@ -1309,11 +1319,7 @@ static void handle_key(char c)
                      (g_fm.sel >= 0 && g_fm.sel < g_fm.nent) ? g_fm.sel : -1);
         break;
     case '.':                                    /* toggle hidden (dotfiles) */
-        g_fm.show_hidden = !g_fm.show_hidden;
-        reload_dir();
-        set_status(g_fm.show_hidden ? "hidden files shown"
-                                    : "hidden files hidden", THEME_TEXT_DIM);
-        g_fm.dirty = 1;
+        toggle_hidden();
         break;
     default: break;
     }
@@ -1469,6 +1475,64 @@ static void handle_mouse(lumen_event_t *ev)
     }
 }
 
+/* ── Top-bar menu (Lumen focused-window menu bar) ─────────────────────── */
+
+enum {
+    MENU_NEWDIR = 1, MENU_RENAME, MENU_DELETE, MENU_CLOSE,
+    MENU_COPY, MENU_CUT, MENU_PASTE,
+    MENU_BACK, MENU_FWD, MENU_UP,
+    MENU_REFRESH, MENU_HIDDEN,
+};
+
+static void publish_menu(void)
+{
+    lumen_set_menu_t m;
+    glyph_menu_reset(&m, g_fm.lwin->id);
+
+    int file = glyph_menu_add_col(&m, "File");
+    glyph_menu_add_item(&m, file, "New Folder...", MENU_NEWDIR);
+    glyph_menu_add_item(&m, file, "Rename...",     MENU_RENAME);
+    glyph_menu_add_item(&m, file, "Delete...",     MENU_DELETE);
+    glyph_menu_add_sep(&m, file);
+    glyph_menu_add_item(&m, file, "Close",         MENU_CLOSE);
+
+    int edit = glyph_menu_add_col(&m, "Edit");
+    glyph_menu_add_item(&m, edit, "Copy",  MENU_COPY);
+    glyph_menu_add_item(&m, edit, "Cut",   MENU_CUT);
+    glyph_menu_add_item(&m, edit, "Paste", MENU_PASTE);
+
+    int go = glyph_menu_add_col(&m, "Go");
+    glyph_menu_add_item(&m, go, "Back",    MENU_BACK);
+    glyph_menu_add_item(&m, go, "Forward", MENU_FWD);
+    glyph_menu_add_item(&m, go, "Up",      MENU_UP);
+
+    int view = glyph_menu_add_col(&m, "View");
+    glyph_menu_add_item(&m, view, "Refresh",     MENU_REFRESH);
+    glyph_menu_add_item(&m, view, "Show Hidden", MENU_HIDDEN);
+
+    lumen_window_set_menu(g_fm.lwin, &m);
+}
+
+static void menu_invoke(uint32_t cmd)
+{
+    switch (cmd) {
+    case MENU_NEWDIR:  modal_open(MODAL_NEWDIR); break;
+    case MENU_RENAME:  modal_open(MODAL_RENAME); break;
+    case MENU_DELETE:  modal_open(MODAL_DELETE); break;
+    case MENU_CLOSE:   g_fm.done = 1;            break;
+    case MENU_COPY:    clip_set(0);              break;
+    case MENU_CUT:     clip_set(1);              break;
+    case MENU_PASTE:   do_paste();               break;
+    case MENU_BACK:    nav_back();               break;
+    case MENU_FWD:     nav_forward();            break;
+    case MENU_UP:      nav_up();                 break;
+    case MENU_REFRESH: reload_dir();             break;
+    case MENU_HIDDEN:  toggle_hidden();          break;
+    default: return;
+    }
+    g_fm.dirty = 1;
+}
+
 /* ── Main ─────────────────────────────────────────────────────────────── */
 
 int main(int argc, char **argv)
@@ -1513,6 +1577,8 @@ int main(int argc, char **argv)
     };
 
     font_init();
+
+    publish_menu();
 
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
@@ -1564,6 +1630,8 @@ int main(int argc, char **argv)
                     g_fm.dirty = 1;
                 }
             }
+            if (ev.type == LUMEN_EV_MENU_INVOKE)
+                menu_invoke(ev.menu.command);
             if (ev.type == LUMEN_EV_KEY && ev.key.pressed)
                 handle_key((char)ev.key.keycode);
             if (ev.type == LUMEN_EV_MOUSE)

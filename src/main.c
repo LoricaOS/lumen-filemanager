@@ -35,6 +35,7 @@
 #include <layout.h>
 #include <lumen_client.h>
 #include "font.h"
+#include "tree.h"
 
 #define WIN_W 640
 #define WIN_H 480
@@ -581,8 +582,14 @@ static void modal_open(modal_t kind)
         break;
     case MODAL_DELETE:
         if (!e) return;
-        snprintf(g_fm.modal_msg, sizeof(g_fm.modal_msg),
-                 "Delete %s \"%s\"?", e->is_dir ? "folder" : "file", e->name);
+        /* Deleting a folder takes its contents with it (remove_tree) — say
+         * so, there is no trash to restore from. */
+        if (e->is_dir)
+            snprintf(g_fm.modal_msg, sizeof(g_fm.modal_msg),
+                     "Delete folder \"%s\" and everything in it?", e->name);
+        else
+            snprintf(g_fm.modal_msg, sizeof(g_fm.modal_msg),
+                     "Delete file \"%s\"?", e->name);
         break;
     default:
         return;
@@ -639,9 +646,9 @@ static void do_delete(void)
     if (!e) return;
     char full[800];
     join_path(full, sizeof(full), g_fm.cwd, e->name);
-    int r = e->is_dir ? rmdir(full) : unlink(full);
+    int r = remove_tree(full, 0);
     if (r != 0) {
-        set_status_err("delete", errno);
+        set_status_err("delete", -r);
     } else {
         reload_dir();
         dprintf(2, "[FILES] op=delete path=%s\n", full);
@@ -663,33 +670,6 @@ static void clip_set(int cut)
     set_status(msg, THEME_OK);
 }
 
-/* Chunked file copy. Returns 0 on success, -errno on failure. */
-static int copy_file(const char *from, const char *to)
-{
-    int sfd = open(from, O_RDONLY);
-    if (sfd < 0) return -errno;
-    int dfd = open(to, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (dfd < 0) { int e = errno; close(sfd); return -e; }
-    static char buf[16384];
-    int rc = 0;
-    for (;;) {
-        ssize_t n = read(sfd, buf, sizeof(buf));
-        if (n == 0) break;
-        if (n < 0) { rc = -errno; break; }
-        ssize_t off = 0;
-        while (off < n) {
-            ssize_t w = write(dfd, buf + off, (size_t)(n - off));
-            if (w <= 0) { rc = -errno; break; }
-            off += w;
-        }
-        if (rc) break;
-    }
-    close(sfd);
-    close(dfd);
-    if (rc) unlink(to);
-    return rc;
-}
-
 static void do_paste(void)
 {
     if (!g_fm.clip_valid) {
@@ -708,23 +688,18 @@ static void do_paste(void)
         return;
     }
 
+    if (g_fm.clip_is_dir && path_within(g_fm.cwd, g_fm.clip)) {
+        set_status("cannot paste a folder into itself", THEME_WARN);
+        return;
+    }
+
     if (g_fm.clip_cut) {
-        int r = rename(g_fm.clip, dest);
-        if (r != 0 && !g_fm.clip_is_dir) {
-            /* cross-fs move (e.g. /tmp ↔ ext2): copy + unlink fallback */
-            r = copy_file(g_fm.clip, dest);
-            if (r == 0) r = unlink(g_fm.clip) ? -errno : 0;
-            else        errno = -r;
-        }
-        if (r != 0) { set_status_err("move", errno); return; }
+        int r = move_tree(g_fm.clip, dest);
+        if (r != 0) { set_status_err("move", -r); return; }
         g_fm.clip_valid = 0;
         dprintf(2, "[FILES] op=move from=%s to=%s\n", g_fm.clip, dest);
     } else {
-        if (g_fm.clip_is_dir) {
-            set_status("copying folders is not supported yet", THEME_WARN);
-            return;
-        }
-        int r = copy_file(g_fm.clip, dest);
+        int r = copy_tree(g_fm.clip, dest, 0);
         if (r != 0) { set_status_err("copy", -r); return; }
         dprintf(2, "[FILES] op=copy from=%s to=%s\n", g_fm.clip, dest);
     }
@@ -822,13 +797,9 @@ static void drop_into(const char *path, const char *dest_dir, int op)
     join_path(dest, sizeof(dest), dest_dir, base);
     if (strcmp(dest, path) == 0) return;   /* dropped where it lives */
 
-    if (src_is_dir) {
-        size_t plen = strlen(path);
-        if (strncmp(dest_dir, path, plen) == 0 &&
-            (dest_dir[plen] == '/' || dest_dir[plen] == '\0')) {
-            set_status("cannot move a folder into itself", THEME_WARN);
-            return;
-        }
+    if (src_is_dir && path_within(dest_dir, path)) {
+        set_status("cannot move a folder into itself", THEME_WARN);
+        return;
     }
 
     struct stat stbuf;
@@ -838,22 +809,12 @@ static void drop_into(const char *path, const char *dest_dir, int op)
     }
 
     if (op == LUMEN_DND_COPY) {
-        if (src_is_dir) {
-            set_status("copying folders is not supported yet", THEME_WARN);
-            return;
-        }
-        int r = copy_file(path, dest);
+        int r = copy_tree(path, dest, 0);
         if (r != 0) { set_status_err("copy", -r); return; }
         dprintf(2, "[FILES] op=copy from=%s to=%s\n", path, dest);
     } else {
-        int r = rename(path, dest);
-        if (r != 0 && !src_is_dir) {
-            /* cross-fs move: copy + unlink fallback */
-            r = copy_file(path, dest);
-            if (r == 0) r = unlink(path) ? -errno : 0;
-            else        errno = -r;
-        }
-        if (r != 0) { set_status_err("move", errno); return; }
+        int r = move_tree(path, dest);
+        if (r != 0) { set_status_err("move", -r); return; }
         dprintf(2, "[FILES] op=move from=%s to=%s\n", path, dest);
     }
     reload_dir();

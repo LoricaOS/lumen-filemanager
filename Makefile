@@ -32,6 +32,12 @@ component.elf: $(SRCS) toolkit/include/glyph.h
 package: component.elf
 	sh tools/pack.sh
 
+# Host self-check for the recursive tree operations. No toolkit needed —
+# tree.c is plain POSIX, which is the point of it being its own file.
+check:
+	$(CC) -O1 -Wall -Wextra -o /tmp/fm-tree-test test/tree_test.c src/tree.c
+	/tmp/fm-tree-test
+
 clean:
 	rm -f component.elf *.hpkg *.hpkg.sig
 	rm -rf toolkit
